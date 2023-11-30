@@ -60,22 +60,42 @@ def connection(config_file):
 
     # Connection string using the credentials from the config file
     conn_string = f'{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
-    db = create_engine(f'postgresql+psycopg2://{conn_string}', echo=False)
 
-    # Connect to your PostgreSQL database
-    conn = db.connect()
+    try:
+        db = create_engine(f'postgresql+psycopg2://{conn_string}', echo=False)
+        # Connect to your PostgreSQL database
+        conn = db.connect()
+        print("Connected successfully.")
+    except Exception as e:
+        print('Connection to database failed.', e, sep='\n')
+        db, conn = None, None
 
     return db, conn
 
 
+def run_query(conn, query):
+    result = None
+
+    try:
+        result = pd.read_sql_query(query, conn)
+    except Exception as e:
+        print('Error encountered: ', e, sep='\n')
+    return result
+
+
+def close_connection(engine, db_connection):
+    db_connection.close()
+    engine.dispose()
+    print('Successfully closed.')
+
+
 def main():
     db, conn = connection('config.txt')
-    query = 'SELECT volume FROM historicaldata'
-    df = pd.read_sql_query(query, db)
+    query_volume = 'SELECT volume FROM historicaldata'
+    df = run_query(conn, query_volume)
     print(df.head())
 
-    conn.close()
-    db.dispose()
+    close_connection(db, conn)
 
 
 if __name__ == '__main__':
