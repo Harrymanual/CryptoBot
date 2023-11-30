@@ -3,7 +3,8 @@ import psycopg2
 import pandas as pd
 
 from sqlalchemy import create_engine, text
-
+# PLEASE DON'T RUN THIS AGAIN OR ILL BE SAD :( !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Read database credentials from the config file
 
 
 def write_historical_data_(csv_file_path):
@@ -55,9 +56,10 @@ def connection(config_file):
         db_name = file.readline().strip()
         db_user = file.readline().strip()
         db_password = file.readline().strip()
+        db_port = file.readline().strip()
 
     # Connection string using the credentials from the config file
-    conn_string = f'{db_user}:{db_password}@{db_host}/{db_name}'
+    conn_string = f'{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
     db = create_engine(f'postgresql+psycopg2://{conn_string}', echo=False)
 
     # Connect to your PostgreSQL database
