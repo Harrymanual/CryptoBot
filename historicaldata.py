@@ -3,8 +3,7 @@ import psycopg2
 import pandas as pd
 
 from sqlalchemy import create_engine, text
-# PLEASE DON'T RUN THIS AGAIN OR ILL BE SAD :( !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# Read database credentials from the config file
+
 
 
 def write_historical_data_(csv_file_path):
@@ -56,46 +55,25 @@ def connection(config_file):
         db_name = file.readline().strip()
         db_user = file.readline().strip()
         db_password = file.readline().strip()
-        db_port = file.readline().strip()
 
     # Connection string using the credentials from the config file
-    conn_string = f'{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+    conn_string = f'{db_user}:{db_password}@{db_host}/{db_name}'
+    db = create_engine(f'postgresql+psycopg2://{conn_string}', echo=False)
 
-    try:
-        db = create_engine(f'postgresql+psycopg2://{conn_string}', echo=False)
-        # Connect to your PostgreSQL database
-        conn = db.connect()
-        print("Connected successfully.")
-    except Exception as e:
-        print('Connection to database failed.', e, sep='\n')
-        db, conn = None, None
+    # Connect to your PostgreSQL database
+    conn = db.connect()
 
     return db, conn
 
 
-def run_query(conn, query):
-    result = None
-
-    try:
-        result = pd.read_sql_query(query, conn)
-    except Exception as e:
-        print('Error encountered: ', e, sep='\n')
-    return result
-
-
-def close_connection(engine, db_connection):
-    db_connection.close()
-    engine.dispose()
-    print('Successfully closed.')
-
-
 def main():
     db, conn = connection('config.txt')
-    query_volume = 'SELECT volume FROM historicaldata'
-    df = run_query(conn, query_volume)
+    query = 'SELECT volume FROM historicaldata'
+    df = pd.read_sql_query(query, db)
     print(df.head())
 
-    close_connection(db, conn)
+    conn.close()
+    db.dispose()
 
 
 if __name__ == '__main__':
