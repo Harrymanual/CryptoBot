@@ -4,6 +4,11 @@ import threading
 from sqlalchemy import create_engine, text
 from lxml import html
 
+
+# Cryptocurrencies to fetch
+cryptos = ["btc", "eth", "ltc", "bch", "bnb", "eos", "xrp", "xlm", "link", "dot", "yfi"]
+
+
 # Database connection function
 def connection(config_file):
     with open(config_file, 'r') as file:
@@ -25,30 +30,35 @@ def connection(config_file):
 
     return db, conn
 
-# Function to create the 'ourdata' table with an additional column for Fear and Greed Index
+# Function to create the table with a column for each cryptocurrency and Fear and Greed Index
 def create_ourdata_table(conn):
-    conn.execute(text('''
+    columns = ', '.join([f'{crypto}_usd FLOAT' for crypto in cryptos])
+    conn.execute(text(f'''
         CREATE TABLE IF NOT EXISTS greedprice (
             timestamp TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
-            btc_price_usd FLOAT,
+            {columns},
             fear_greed_index TEXT
         );
     '''))
     conn.commit()
 
-# Function to write the BTC price and Fear and Greed Index into the 'ourdata' table
-def write_data(conn, price, index):
-    conn.execute(text('''
-        INSERT INTO greedprice (btc_price_usd, fear_greed_index)
-        VALUES (:price, :index)
-    '''), {'price': price, 'index': index})
-    conn.commit()
-
-# Function to fetch the BTC price
-def get_btc_price():
-    response = requests.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
+# Function to fetch the prices of cryptocurrencies
+def get_crypto_prices():
+    ids = ','.join(cryptos)
+    response = requests.get(f'https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd')
     data = response.json()
-    return data['bitcoin']['usd']
+    return {crypto: data[crypto]['usd'] for crypto in cryptos}
+
+# Function to write the data into the 'greedprice' table
+def write_data(conn, prices, index):
+    columns = ', '.join(cryptos)
+    placeholders = ', '.join([f':{crypto}' for crypto in cryptos])
+    values = {'index': index, **prices}
+    conn.execute(text(f'''
+        INSERT INTO greedprice ({columns}, fear_greed_index)
+        VALUES ({placeholders}, :index)
+    '''), values)
+    conn.commit()
 
 # Function to fetch the Fear and Greed Index
 def get_fear_greed_index():
@@ -57,16 +67,30 @@ def get_fear_greed_index():
     index = tree.xpath('/html/body/div/main/section/div/div[3]/div[2]/div/div/div[1]/div[2]/div/text()')
     return index[0].strip() if index else "Not Found"
 
+# Function to drop the 'greedprice' table !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+def drop_ourdata_table(conn):
+    try:
+        conn.execute(text('DROP TABLE IF EXISTS greedprice;'))
+        print("Table 'greedprice' dropped successfully.")
+    except Exception as e:
+        print('Error dropping table:', e)
+    conn.commit()
+
 # Main function
 def main(stop_event):
     db, conn = connection('config.txt')  # Ensure 'config.txt' is in the same directory as this script
+
+    # Drop the table before creating a new one !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    drop_ourdata_table(conn)
+
+
     create_ourdata_table(conn)
 
     while not stop_event.is_set():
-        price = get_btc_price()
+        prices = get_crypto_prices()
         index = get_fear_greed_index()
-        print(f"The current price of BTC is: ${price} USD, Fear and Greed Index: {index}")
-        write_data(conn, price, index)
+        print(f"Crypto Prices: {prices}, Fear and Greed Index: {index}")
+        write_data(conn, prices, index)
         time.sleep(10)
 
     # Close the connection when the loop is terminated
